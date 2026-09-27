@@ -1,0 +1,85 @@
+{
+  "_comment": "Illustrative, fictional content for `python main.py --demo`. Not real news.",
+  "generated_at": "2026-09-28T06:00:00Z",
+  "language": "en",
+  "model": "gemini-3.8-flash",
+  "key_points": [
+    "Energy is the common thread: tighter LNG supply is pushing European utilities toward longer Asian-indexed contracts, while shipping rates for older tankers hit records.",
+    "Central banks are split: the Fed signals patience while the ECB hints at one more cut, widening the rate differential that supports the dollar.",
+    "Semiconductor export controls are shifting from chips to equipment servicing, a change that affects installed capacity rather than just new orders.",
+    "Fiscal pressure is building in the UK and France, where budget debates are running into bond market limits."
+  ],
+  "sections": [
+    {
+      "category": "markets",
+      "items": [
+        {
+          "headline": "Older supertankers now trade above new builds",
+          "context": "Sanctions and rerouting have lengthened voyages, while the order book for new crude carriers remains at multi-decade lows.",
+          "impact": "Higher freight costs feed into delivered oil prices and widen regional crude spreads, benefiting owners of legacy fleets at the expense of refiners.",
+          "conclusion": "Watch newbuild orders at Asian yards: a surge would signal owners expect the premium to last beyond 2028.",
+          "source": "Sample Markets Wire",
+          "link": "https://example.com/markets/tankers",
+          "original_title": "Value of old supertankers soars past new builds",
+          "published": "2026-09-28T04:00:00Z"
+        },
+        {
+          "headline": "Private credit outflows slow after a turbulent quarter",
+          "context": "Redemption requests at semi-liquid private credit funds spiked after several high-profile defaults in leveraged software loans.",
+          "impact": "Slower withdrawals reduce forced selling, but managers are still gating funds, which keeps a lid on new lending to mid-market companies.",
+          "conclusion": "The asset class is stabilising, not recovering; default rates in Q4 remain the key test.",
+          "source": "Sample Finance Daily",
+          "link": "https://example.com/finance/private-credit",
+          "original_title": "Private credit turmoil eases as investor withdrawals slow",
+          "published": "2026-09-28T03:10:00Z"
+        }
+      ]
+    },
+    {
+      "category": "geopolitics",
+      "items": [
+        {
+          "headline": "Talks over the Strait of Hormuz stall after US rejects reopening plan",
+          "context": "Roughly a fifth of global oil supply transits the strait, which has faced intermittent disruption since the conflict began.",
+          "impact": "A prolonged impasse keeps a risk premium in crude and LNG prices and pushes Asian importers to draw on strategic reserves.",
+          "conclusion": "Any shift toward mediated talks would likely compress energy prices quickly; absent that, expect volatility around each diplomatic signal.",
+          "source": "Sample World Service",
+          "link": "https://example.com/world/hormuz",
+          "original_title": "Iranian minister says only negotiation can end conflict",
+          "published": "2026-09-28T02:44:00Z"
+        }
+      ]
+    },
+    {
+      "category": "asia",
+      "items": [
+        {
+          "headline": "South Korea launches a nationwide AI adoption programme",
+          "context": "Seoul is pairing public compute subsidies with incentives for small manufacturers to deploy AI in production lines.",
+          "impact": "The plan supports domestic demand for memory chips and positions Korean conglomerates as integrators, not just component suppliers.",
+          "conclusion": "Execution risk is high, but the policy signals a shift from hardware exports to domestic AI services.",
+          "source": "Sample Asia Review",
+          "link": "https://example.com/asia/korea-ai",
+          "original_title": "South Korea bets big on AI for all",
+          "published": null
+        }
+      ]
+    },
+    {
+      "category": "technology",
+      "items": [
+        {
+          "headline": "Alternatives to GPS move toward commercial deployment",
+          "context": "Jamming and spoofing of satellite navigation have risen sharply near conflict zones, affecting aviation and shipping.",
+          "impact": "Quantum and LEO-based positioning systems could become critical infrastructure, opening a defence-adjacent market for navigation suppliers.",
+          "conclusion": "Regulatory certification for aviation will set the pace of adoption more than the technology itself.",
+          "source": "Sample Tech Journal",
+          "link": "https://example.com/tech/gps-alternatives",
+          "original_title": "Alternatives to GPS are around the corner",
+          "published": "2026-09-28T01:25:00Z"
+        }
+      ]
+    }
+  ],
+  "failed_categories": []
+}

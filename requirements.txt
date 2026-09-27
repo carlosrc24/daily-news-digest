@@ -1,0 +1,7 @@
+# Runtime dependencies
+google-genai>=2.0,<3.0      # Official Google Gemini SDK
+feedparser>=6.0,<7.0        # RSS/Atom parsing
+python-dotenv>=1.0,<2.0     # Loads .env in local development
+pydantic>=2.7,<3.0          # Schemas for Gemini's structured output
+jinja2>=3.1,<4.0            # HTML email templating (autoescape on)
+tenacity>=8.2,<10.0         # Retries with exponential backoff for the Gemini API
