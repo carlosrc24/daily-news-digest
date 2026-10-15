@@ -19,7 +19,7 @@ from src.config import ConfigError, Settings, load_settings
 from src.fetcher import fetch_all
 from src.i18n import category_label, labels
 from src.mailer import build_message, build_subject, render_html, render_text, send_email
-from src.models import Article, Digest, DigestSection
+from src.models import Article, Digest
 from src.summarizer import Summarizer
 
 logger = logging.getLogger("digest")
@@ -30,45 +30,26 @@ SAMPLE_DIGEST = Path(__file__).parent / "examples" / "sample_digest.json"
 def build_digest(
     settings: Settings, candidates: dict[str, list[Article]], summarizer: Summarizer
 ) -> Digest:
-    """Summarise each category independently; a failing category is reported, not fatal."""
-    lang = settings.language
-    sections: list[DigestSection] = []
-    failed: list[str] = []
-
-    for category, articles in candidates.items():
-        if not articles:
-            logger.warning("No recent articles for %s", category)
-            continue
-        try:
-            items = summarizer.summarize_category(
-                category_label(category, "en"),
-                articles,
-                limit=settings.articles_per_category,
-                lookback_hours=settings.lookback_hours,
-            )
-        except Exception as exc:
-            logger.error("Summarisation failed for %s: %s", category, exc)
-            failed.append(category)
-            continue
-        logger.info("%-12s %d/%d articles selected", category, len(items), len(articles))
-        if items:
-            sections.append(DigestSection(category=category, items=items))
+    """Rank every candidate in one call; the daily brief is optional on top of that."""
+    articles = [a for category in candidates.values() for a in category]
+    items = summarizer.select_stories(
+        articles, limit=settings.max_stories, lookback_hours=settings.lookback_hours
+    )
+    logger.info("%d/%d articles selected", len(items), len(articles))
 
     key_points: list[str] = []
-    if sections:
+    if items:
         try:
-            names = {s.category: category_label(s.category, lang) for s in sections}
-            key_points = summarizer.daily_brief(sections, names)
+            key_points = summarizer.daily_brief(items)
         except Exception as exc:
             logger.error("Daily brief failed; sending digest without it: %s", exc)
 
     return Digest(
         generated_at=datetime.now(UTC),
-        language=lang,
+        language=settings.language,
         model=", ".join(getattr(summarizer, "models_used", None) or [settings.gemini_model]),
         key_points=key_points,
-        sections=sections,
-        failed_categories=failed,
+        items=items,
     )
 
 
@@ -108,15 +89,19 @@ def cmd_run(*, dry_run: bool, output: Path) -> int:
     logger.info("%d candidate articles across %d categories", total, len(candidates))
 
     summarizer = Summarizer(settings.gemini_api_key, settings.gemini_models, settings.language)
-    digest = build_digest(settings, candidates, summarizer)
-    if not digest.sections:
-        logger.error("Every category failed or was empty; not sending an empty digest")
+    try:
+        digest = build_digest(settings, candidates, summarizer)
+    except Exception as exc:
+        logger.error("Story selection failed; nothing sent: %s", exc)
+        return 1
+    if not digest.items:
+        logger.error("No relevant stories selected; not sending an empty digest")
         return 1
 
     html = render_html(digest)
     write_output(html, output)
     if dry_run:
-        logger.info("Dry run: email not sent (%d articles)", digest.article_count)
+        logger.info("Dry run: email not sent (%d stories)", len(digest.items))
         return 0
 
     message = build_message(
@@ -127,8 +112,7 @@ def cmd_run(*, dry_run: bool, output: Path) -> int:
         text=render_text(digest),
     )
     send_email(settings, message)
-    # Partial failures still deliver an email, but surface as a non-zero exit so CI shows it.
-    return 2 if digest.failed_categories else 0
+    return 0
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

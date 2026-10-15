@@ -93,8 +93,8 @@ class Settings:
     smtp_port: int = 587
     language: str = "en"
     lookback_hours: int = 24
-    articles_per_category: int = 4
-    candidates_per_category: int = 12
+    max_stories: int = 10
+    candidates_per_category: int = 10
     max_per_feed: int = 8
     request_timeout: float = 15.0
     feeds: dict[str, list[Feed]] = field(default_factory=lambda: DEFAULT_FEEDS)
@@ -137,8 +137,6 @@ def load_settings(*, require_gemini: bool = True, require_email: bool = True) ->
     receivers = tuple(
         addr.strip() for addr in os.getenv("EMAIL_RECEIVER", "").split(",") if addr.strip()
     )
-    articles = _int_env("ARTICLES_PER_CATEGORY", 4)
-
     settings = Settings(
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
         gemini_model=os.getenv("GEMINI_MODEL", "").strip() or DEFAULT_MODEL,
@@ -152,9 +150,9 @@ def load_settings(*, require_gemini: bool = True, require_email: bool = True) ->
         smtp_port=_int_env("SMTP_PORT", 587),
         language=(os.getenv("DIGEST_LANGUAGE", "").strip() or "en").lower(),
         lookback_hours=_int_env("LOOKBACK_HOURS", 24),
-        articles_per_category=articles,
-        # Send the model ~3x candidates so it can actually choose the most relevant.
-        candidates_per_category=_int_env("CANDIDATES_PER_CATEGORY", articles * 3),
+        max_stories=_int_env("MAX_STORIES", 10),
+        # Every category's candidates go into one ranking call (6 x 10 = 60 articles).
+        candidates_per_category=_int_env("CANDIDATES_PER_CATEGORY", 10),
         max_per_feed=_int_env("MAX_PER_FEED", 8),
     )
 

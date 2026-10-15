@@ -15,16 +15,18 @@ en **GitHub Actions**.
 
 ## Características
 
-- **6 secciones**: Estados Unidos, Europa, Asia y Japón, Mercados y Economía, Geopolítica y
-  Tecnología, con ~30 feeds verificados (FT, BBC, The Economist, Nikkei Asia, SCMP...).
-- **Análisis estructurado** por noticia: *Contexto*, *Impacto* económico/geopolítico y
-  *Conclusión*, más un bloque inicial **"Lo esencial del día"** que conecta las secciones.
-- **Selección por relevancia**: Gemini recibe ~3× candidatos por sección, elige los más
-  significativos y descarta duplicados de la misma historia entre medios.
+- **Las 10 noticias clave del día**: ~30 feeds verificados (FT, BBC, The Economist, Nikkei
+  Asia, SCMP...) de EE. UU., Europa, Asia, mercados, geopolítica y tecnología se comparan
+  juntos, y Gemini se queda con las 10 más importantes sea cual sea su tema.
+- **Corto y al grano**: cada noticia es un titular, una etiqueta de tema (Economía,
+  Geopolítica, Tecnología) y un resumen de 3-4 frases, más un bloque inicial
+  **"Lo esencial del día"**.
+- **Selección por relevancia**: el modelo descarta noticias menores y duplicados de la misma
+  historia entre medios.
 - **Multilenguaje**: `DIGEST_LANGUAGE=es|en|fr|...` controla el idioma del análisis y de la
   plantilla.
-- **Tolerante a fallos**: un feed caído o una sección fallida no impiden el envío.
-- **Coste cero**: tier gratuito de Gemini (~7 llamadas/día) + GitHub Actions + Gmail SMTP.
+- **Tolerante a fallos**: un feed caído o un fallo en el resumen del día no impiden el envío.
+- **Coste cero**: tier gratuito de Gemini (2 llamadas/día) + GitHub Actions + Gmail SMTP.
 - **Modelo de respaldo**: si el modelo principal está saturado (503) o sin cuota diaria (429),
   se usa automáticamente un segundo modelo con cuota independiente.
 
@@ -34,8 +36,8 @@ en **GitHub Actions**.
                 ┌────────────┐     ┌──────────────┐     ┌────────────┐
  RSS feeds ───▶ │ fetcher.py │ ──▶ │ summarizer.py│ ──▶ │ mailer.py  │ ──▶ Gmail
  (~30, en       │ descarga,  │     │ Gemini: 1    │     │ Jinja2 →   │     (SMTP
-  paralelo)     │ filtra 24h,│     │ llamada por  │     │ HTML + txt │      587 TLS)
-                │ deduplica  │     │ sección + 1  │     │            │
+  paralelo)     │ filtra 24h,│     │ llamada de   │     │ HTML + txt │      587 TLS)
+                │ deduplica  │     │ ranking + 1  │     │            │
                 └────────────┘     │ resumen día  │     └────────────┘
                                    └──────────────┘
                         main.py orquesta · config.py carga .env y feeds
@@ -61,9 +63,9 @@ en **GitHub Actions**.
 - **El modelo no puede inventar enlaces.** A Gemini solo se le pide `article_id` + análisis;
   el titular original, la fuente y la URL se recuperan de los datos RSS. IDs desconocidos o
   repetidos se descartan.
-- **Una llamada por sección.** Permite que el modelo compare y priorice noticias de varias
-  fuentes, cabe holgadamente en los límites gratuitos, y aísla fallos (si una sección falla,
-  el resto se envía y el pie del correo lo indica).
+- **Una sola llamada de ranking con todos los candidatos.** El modelo compara todos los
+  temas entre sí para elegir las noticias clave del día, y cada ejecución solo necesita dos
+  peticiones, muy por debajo del límite gratuito.
 - **Reintentos selectivos y modelo de respaldo.** Backoff (tenacity) solo para `5xx` y `429`
   por minuto, respetando el *"retry in Ns"* que sugiere la API. Un `429` de cuota **diaria**
   no se reintenta (solo gastaría peticiones): se marca el modelo como agotado y se pasa al
@@ -129,7 +131,7 @@ python main.py               # ejecución completa: genera y envía el correo
    | `EMAIL_RECEIVER` | Destinatario(s), separados por comas |
 
 3. (Opcional) En la pestaña **Variables**, define `DIGEST_LANGUAGE` (p. ej. `es`),
-   `GEMINI_MODEL` o `ARTICLES_PER_CATEGORY`.
+   `GEMINI_MODEL` o `MAX_STORIES`.
 4. Pruébalo en **Actions → Daily digest → Run workflow** (marca *dry_run* para generar sin
    enviar; el HTML queda como artefacto descargable de la ejecución).
 
@@ -159,8 +161,8 @@ Para otra hora o zona, cambia los dos `cron` y `LOCAL_TZ` en `.github/workflows/
 | `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | Modelo de respaldo (`none` lo desactiva) |
 | `DIGEST_LANGUAGE` | `en` | Idioma del análisis y la plantilla (`en`, `es`; otros códigos usan etiquetas en inglés) |
 | `LOOKBACK_HOURS` | `24` | Ventana temporal de noticias |
-| `ARTICLES_PER_CATEGORY` | `4` | Noticias por sección en el correo |
-| `CANDIDATES_PER_CATEGORY` | `3 × ARTICLES` | Candidatos enviados a Gemini por sección |
+| `MAX_STORIES` | `10` | Máximo de noticias en el correo |
+| `CANDIDATES_PER_CATEGORY` | `10` | Candidatos por categoría de feeds enviados al ranking |
 | `MAX_PER_FEED` | `8` | Entradas máximas leídas de cada feed |
 
 Los feeds se definen en `DEFAULT_FEEDS` (`src/config.py`); añadir una sección nueva es
@@ -171,8 +173,7 @@ añadir una clave allí y su etiqueta en `src/i18n.py`.
 | Código | Significado |
 |---|---|
 | `0` | Boletín generado (y enviado) correctamente |
-| `1` | Error de configuración, ningún feed disponible o todas las secciones fallaron: **no se envía nada** |
-| `2` | Enviado, pero alguna sección falló (el run de Actions aparece en rojo para que lo revises) |
+| `1` | Error de configuración, ningún feed disponible o falló la selección de noticias: **no se envía nada** |
 
 ## Tests y calidad
 

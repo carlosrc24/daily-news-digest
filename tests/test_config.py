@@ -5,7 +5,7 @@ from src.config import DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL, ConfigError, load_
 ENV_VARS = [
     "GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_FALLBACK_MODEL",
     "EMAIL_SENDER", "EMAIL_PASSWORD", "EMAIL_RECEIVER",
-    "DIGEST_LANGUAGE", "ARTICLES_PER_CATEGORY", "CANDIDATES_PER_CATEGORY",
+    "DIGEST_LANGUAGE", "MAX_STORIES", "CANDIDATES_PER_CATEGORY",
 ]  # fmt: skip
 
 
@@ -30,26 +30,27 @@ def test_dry_run_only_needs_gemini(monkeypatch):
     assert settings.language == "en"
 
 
-def test_parses_receivers_password_and_derived_defaults(monkeypatch):
+def test_parses_receivers_password_and_defaults(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setenv("EMAIL_SENDER", "me@gmail.com")
     monkeypatch.setenv("EMAIL_PASSWORD", "abcd efgh ijkl mnop")
     monkeypatch.setenv("EMAIL_RECEIVER", "a@x.com, b@x.com ,")
     monkeypatch.setenv("DIGEST_LANGUAGE", "ES")
-    monkeypatch.setenv("ARTICLES_PER_CATEGORY", "5")
+    monkeypatch.setenv("MAX_STORIES", "5")
 
     settings = load_settings()
 
     assert settings.email_receivers == ("a@x.com", "b@x.com")
     assert settings.email_password == "abcdefghijklmnop"  # noqa: S105
     assert settings.language == "es"
-    assert settings.candidates_per_category == 15
+    assert settings.max_stories == 5
+    assert settings.candidates_per_category == 10
 
 
 @pytest.mark.parametrize("value", ["abc", "0"])
 def test_invalid_integers_are_rejected(monkeypatch, value):
-    monkeypatch.setenv("ARTICLES_PER_CATEGORY", value)
-    with pytest.raises(ConfigError, match="ARTICLES_PER_CATEGORY"):
+    monkeypatch.setenv("MAX_STORIES", value)
+    with pytest.raises(ConfigError, match="MAX_STORIES"):
         load_settings(require_gemini=False, require_email=False)
 
 

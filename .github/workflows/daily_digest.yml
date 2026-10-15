@@ -79,7 +79,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           GEMINI_FALLBACK_MODEL: ${{ vars.GEMINI_FALLBACK_MODEL }}
           DIGEST_LANGUAGE: ${{ vars.DIGEST_LANGUAGE }}
-          ARTICLES_PER_CATEGORY: ${{ vars.ARTICLES_PER_CATEGORY }}
+          MAX_STORIES: ${{ vars.MAX_STORIES }}
         run: python main.py ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Upload rendered HTML

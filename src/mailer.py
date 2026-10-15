@@ -14,7 +14,7 @@ from email.utils import formataddr, formatdate, make_msgid
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from src.config import Settings
-from src.i18n import category_label, format_date, labels
+from src.i18n import format_date, labels, topic_label
 from src.models import Digest
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def build_subject(digest: Digest) -> str:
 def render_html(digest: Digest) -> str:
     lang = digest.language
     t = labels(lang)
-    stats = t["stats"].format(articles=digest.article_count, sections=len(digest.sections))
+    stats = t["stats"].format(articles=len(digest.items))
     first = digest.key_points[0] if digest.key_points else stats
     return _env.get_template("digest.html.j2").render(
         digest=digest,
@@ -46,8 +46,7 @@ def render_html(digest: Digest) -> str:
         stats=stats,
         preheader=first,
         footer=t["footer"].format(model=digest.model),
-        category_label=lambda c: category_label(c, lang),
-        failed=[category_label(c, lang) for c in digest.failed_categories],
+        topic_label=lambda topic: topic_label(topic, lang),
     )
 
 
@@ -59,14 +58,13 @@ def render_text(digest: Digest) -> str:
     lines = [t["title"].upper(), format_date(digest.generated_at, lang), ""]
     if digest.key_points:
         lines += [t["key_points"].upper(), *(wrap.fill(f"- {p}") for p in digest.key_points), ""]
-    for section in digest.sections:
-        header = category_label(section.category, lang).upper()
-        lines += ["=" * len(header), header, "=" * len(header), ""]
-        for item in section.items:
-            lines += [item.headline, f"[{item.source}] {item.link}"]
-            for key in ("context", "impact", "conclusion"):
-                lines.append(wrap.fill(f"{t[key]}: {getattr(item, key)}"))
-            lines.append("")
+    for n, item in enumerate(digest.items, 1):
+        lines += [
+            f"{n}. [{topic_label(item.topic, lang).upper()}] {item.headline}",
+            textwrap.fill(item.summary, width=78),
+            f"{t['read_more']} {item.source}: {item.link}",
+            "",
+        ]
     lines.append(t["footer"].format(model=digest.model))
     return "\n".join(lines)
 

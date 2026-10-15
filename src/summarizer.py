@@ -1,8 +1,9 @@
-"""Gemini integration: select and analyse articles per category, then brief the day.
+"""Gemini integration: pick the day's top stories across all categories, then brief the day.
 
 Design choices:
-- One request per category (plus one for the daily brief) keeps usage well inside
-  the free tier and lets the model rank and de-duplicate stories across sources.
+- One request ranks every candidate together (plus one for the daily brief): two
+  calls a day stay well inside the free tier, and a single ranking lets the model
+  weigh economy, geopolitics and technology against each other and drop duplicates.
 - Structured output (JSON + Pydantic schema) instead of free-form HTML: the
   response is validated, and rendering stays in our own escaped template.
 - The model only returns article ids plus analysis. Titles, links and sources are
@@ -30,7 +31,15 @@ from tenacity import (
 )
 
 from src.i18n import language_name
-from src.models import Article, CategoryAnalysis, DailyBrief, DigestItem, DigestSection
+from src.models import (
+    CATEGORY_TOPICS,
+    DEFAULT_TOPIC,
+    TOPICS,
+    Article,
+    DailyBrief,
+    DailySelection,
+    DigestItem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,29 +63,31 @@ explicitly avoid specifics that the title does not support.
 - Reference articles only by the exact `id` you were given.
 """
 
-CATEGORY_PROMPT = """\
-Category: {category}
+SELECTION_PROMPT = """\
+Below are {count} candidate articles published in the last {hours} hours (JSON), \
+from feeds covering economy, geopolitics and technology.
 
-Below are {count} candidate articles published in the last {hours} hours (JSON).
-Select the {limit} most significant for their economic, geopolitical or \
-technological consequences. If several articles cover the same story, choose the \
-most informative one and ignore the rest. Skip lifestyle, sport and minor local news \
-unless they carry real macro relevance. Order the selection from most to least \
-important. Return fewer than {limit} if fewer are genuinely relevant.
+Select the {limit} most significant stories of the day for their economic, \
+geopolitical or technological consequences, whatever their topic. If several \
+articles cover the same story, choose the most informative one and ignore the rest. \
+Skip lifestyle, sport and minor local news unless they carry real macro relevance. \
+Order the selection from most to least important. Return fewer than {limit} if \
+fewer are genuinely relevant.
 
-For each selected article provide: headline, context, impact and conclusion.
+For each selected story provide its topic, a headline and a summary of 3-4 \
+sentences (60-80 words): what happened, why it matters and what to watch next.
 
 Articles:
 {articles}
 """
 
 BRIEF_PROMPT = """\
-Below are today's analysed stories, grouped by section (JSON). Write 3 to 5 key \
-points that synthesise the day: connect stories across sections where there is a \
-real link, and prioritise what matters most for markets and international affairs. \
-Each point is one or two sentences. Do not repeat headlines verbatim.
+Below are today's selected stories (JSON). Write 3 to 5 key points that synthesise \
+the day: connect stories across topics where there is a real link, and prioritise \
+what matters most for markets and international affairs. Each point is one or two \
+sentences. Do not repeat headlines verbatim.
 
-{sections}
+{stories}
 """
 
 
@@ -177,8 +188,8 @@ class Summarizer:
             raise ValueError("Gemini returned an empty response")
         return schema.model_validate_json(response.text)
 
-    def summarize_category(
-        self, category_label: str, articles: list[Article], *, limit: int, lookback_hours: int
+    def select_stories(
+        self, articles: list[Article], *, limit: int, lookback_hours: int
     ) -> list[DigestItem]:
         if not articles:
             return []
@@ -192,53 +203,49 @@ class Summarizer:
             }
             for a in articles
         ]
-        prompt = CATEGORY_PROMPT.format(
-            category=category_label,
+        prompt = SELECTION_PROMPT.format(
             count=len(articles),
             hours=lookback_hours,
             limit=limit,
             articles=json.dumps(payload, ensure_ascii=False, indent=1),
         )
-        analysis = self._generate(prompt, CategoryAnalysis)
-        return join_analysis(analysis, articles, limit=limit)
+        selection = self._generate(prompt, DailySelection)
+        return join_analysis(selection, articles, limit=limit)
 
-    def daily_brief(self, sections: list[DigestSection], labels: dict[str, str]) -> list[str]:
-        if not sections:
+    def daily_brief(self, items: list[DigestItem]) -> list[str]:
+        if not items:
             return []
-        payload = {
-            labels.get(s.category, s.category): [
-                {"headline": i.headline, "impact": i.impact, "conclusion": i.conclusion}
-                for i in s.items
-            ]
-            for s in sections
-        }
-        prompt = BRIEF_PROMPT.format(sections=json.dumps(payload, ensure_ascii=False, indent=1))
+        payload = [{"topic": i.topic, "headline": i.headline, "summary": i.summary} for i in items]
+        prompt = BRIEF_PROMPT.format(stories=json.dumps(payload, ensure_ascii=False, indent=1))
         brief = self._generate(prompt, DailyBrief)
         return [point.strip() for point in brief.key_points if point.strip()][:5]
 
 
 def join_analysis(
-    analysis: CategoryAnalysis, articles: list[Article], *, limit: int
+    selection: DailySelection, articles: list[Article], *, limit: int
 ) -> list[DigestItem]:
     """Attach trusted RSS metadata to the model's analysis, keeping the model's order.
 
-    Unknown or repeated ids are dropped (and logged) rather than trusted.
+    Unknown or repeated ids are dropped (and logged) rather than trusted. A topic
+    outside ``TOPICS`` is replaced by the one implied by the article's feed category.
     """
     by_id = {a.id: a for a in articles}
     items: list[DigestItem] = []
     used: set[str] = set()
-    for result in analysis.articles:
+    for result in selection.stories:
         article = by_id.get(result.article_id.strip())
         if article is None or article.id in used:
             logger.warning("Discarding analysis with unknown/duplicate id %r", result.article_id)
             continue
         used.add(article.id)
+        topic = result.topic.strip().lower()
+        if topic not in TOPICS:
+            topic = CATEGORY_TOPICS.get(article.category, DEFAULT_TOPIC)
         items.append(
             DigestItem(
+                topic=topic,
                 headline=result.headline.strip() or article.title,
-                context=result.context.strip(),
-                impact=result.impact.strip(),
-                conclusion=result.conclusion.strip(),
+                summary=result.summary.strip(),
                 source=article.source,
                 link=article.link,
                 original_title=article.title,

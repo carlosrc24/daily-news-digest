@@ -1,7 +1,7 @@
 """Domain models shared across the pipeline.
 
 Two families:
-- LLM schemas (``ArticleAnalysis``, ``CategoryAnalysis``, ``DailyBrief``) are
+- LLM schemas (``StoryAnalysis``, ``DailySelection``, ``DailyBrief``) are
   passed to Gemini as ``response_schema``. They deliberately contain no URLs,
   sources or dates: those always come from the RSS data, never from the model.
 - Pipeline models (``Article``, ``Digest``...) carry the joined result.
@@ -10,6 +10,7 @@ Two families:
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,19 +30,30 @@ class Article(BaseModel):
 # --- Gemini structured output --------------------------------------------------
 
 
-class ArticleAnalysis(BaseModel):
+Topic = Literal["economy", "geopolitics", "technology"]
+
+TOPICS: tuple[Topic, ...] = ("economy", "geopolitics", "technology")
+# Topic used when the model's label is not one of TOPICS; derived from the feed category.
+CATEGORY_TOPICS: dict[str, Topic] = {
+    "markets": "economy",
+    "technology": "technology",
+}
+DEFAULT_TOPIC: Topic = "geopolitics"
+
+
+class StoryAnalysis(BaseModel):
     article_id: str = Field(description="The exact id of the input article being analysed.")
+    # Plain str (not Topic) so an unexpected label falls back instead of failing validation.
+    topic: str = Field(description="Main area of the story: economy, geopolitics or technology.")
     headline: str = Field(description="Concise, neutral headline in the output language.")
-    context: str = Field(description="Background needed to understand the news (1-2 sentences).")
-    impact: str = Field(
-        description="Economic and/or geopolitical impact, with the mechanisms involved "
-        "(1-2 sentences)."
+    summary: str = Field(
+        description="What happened, why it matters and what to watch next, in 3-4 sentences "
+        "(60-80 words). Explain the mechanisms, do not restate the headline."
     )
-    conclusion: str = Field(description="Analytical takeaway or what to watch next (1 sentence).")
 
 
-class CategoryAnalysis(BaseModel):
-    articles: list[ArticleAnalysis]
+class DailySelection(BaseModel):
+    stories: list[StoryAnalysis]
 
 
 class DailyBrief(BaseModel):
@@ -52,19 +64,13 @@ class DailyBrief(BaseModel):
 
 
 class DigestItem(BaseModel):
+    topic: Topic
     headline: str
-    context: str
-    impact: str
-    conclusion: str
+    summary: str
     source: str
     link: str
     original_title: str
     published: datetime | None = None
-
-
-class DigestSection(BaseModel):
-    category: str
-    items: list[DigestItem]
 
 
 class Digest(BaseModel):
@@ -72,9 +78,4 @@ class Digest(BaseModel):
     language: str
     model: str
     key_points: list[str] = []
-    sections: list[DigestSection] = []
-    failed_categories: list[str] = []
-
-    @property
-    def article_count(self) -> int:
-        return sum(len(section.items) for section in self.sections)
+    items: list[DigestItem] = []

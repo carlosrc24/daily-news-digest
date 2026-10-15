@@ -4,16 +4,15 @@ from typing import ClassVar
 import pytest
 
 from src.mailer import build_message, build_subject, render_html, render_text, send_email
-from src.models import Digest, DigestItem, DigestSection
+from src.models import Digest, DigestItem
 
 
 @pytest.fixture
 def digest():
     item = DigestItem(
+        topic="geopolitics",
         headline="Rates <script>alert(1)</script> rise",
-        context="Context text",
-        impact="Impact text",
-        conclusion="Conclusion text",
+        summary="Summary text",
         source="Alpha",
         link="https://alpha.test/1",
         original_title="Original",
@@ -24,8 +23,7 @@ def digest():
         language="es",
         model="test-model",
         key_points=["First point"],
-        sections=[DigestSection(category="markets", items=[item])],
-        failed_categories=["technology"],
+        items=[item],
     )
 
 
@@ -34,8 +32,9 @@ def test_html_is_escaped_localised_and_complete(digest):
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;" in html
     assert "Lo esencial del día" in html
-    assert "Mercados y Economía" in html
-    assert "No disponible hoy: Tecnología" in html
+    assert "1 &nbsp;·&nbsp; Geopolítica" in html
+    assert "Summary text" in html
+    assert "Las 1 noticias clave del día" in html
     assert 'href="https://alpha.test/1"' in html
     assert "05:30 UTC" in html
     assert "Lunes, 28 de septiembre de 2026" in html
@@ -48,9 +47,9 @@ def test_unknown_language_falls_back_to_english_labels(digest):
 
 def test_text_version_contains_every_item(digest):
     text = render_text(digest)
-    assert "MERCADOS Y ECONOMÍA" in text
-    assert "https://alpha.test/1" in text
-    assert "Contexto: Context text" in text
+    assert "1. [GEOPOLÍTICA] Rates <script>alert(1)</script> rise" in text
+    assert "Summary text" in text
+    assert "Leer en Alpha: https://alpha.test/1" in text
 
 
 def test_message_is_multipart_alternative_with_html_last(digest):

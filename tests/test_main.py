@@ -3,38 +3,47 @@ from src.models import DigestItem
 
 
 def item(link):
-    return DigestItem(headline="h", context="c", impact="i", conclusion="k",
+    return DigestItem(topic="economy", headline="h", summary="s",
                       source="s", link=link, original_title="o")  # fmt: skip
 
 
 class FakeSummarizer:
-    def __init__(self, fail=(), brief_fails=False):
-        self.fail, self.brief_fails = set(fail), brief_fails
+    def __init__(self, brief_fails=False):
+        self.brief_fails = brief_fails
+        self.received = []
 
-    def summarize_category(self, label, articles, *, limit, lookback_hours):
-        if label in self.fail:
-            raise RuntimeError("quota")
+    def select_stories(self, articles, *, limit, lookback_hours):
+        self.received = articles
         return [item(a.link) for a in articles[:limit]]
 
-    def daily_brief(self, sections, labels):
+    def daily_brief(self, items):
         if self.brief_fails:
             raise RuntimeError("brief down")
         return ["point"]
 
 
-def test_partial_failure_keeps_other_sections(settings, articles):
-    candidates = {"markets": articles, "technology": articles, "geopolitics": []}
-    digest = main.build_digest(settings, candidates, FakeSummarizer(fail={"Technology"}))
+def test_all_categories_are_ranked_together(settings, articles, now):
+    tech = [
+        a.model_copy(update={"id": "technology-1", "category": "technology"}) for a in articles[:1]
+    ]
+    candidates = {"markets": articles, "technology": tech, "geopolitics": []}
+    summarizer = FakeSummarizer()
 
-    assert [s.category for s in digest.sections] == ["markets"]
-    assert len(digest.sections[0].items) == settings.articles_per_category
-    assert digest.failed_categories == ["technology"]
+    digest = main.build_digest(settings, candidates, summarizer)
+
+    assert [a.id for a in summarizer.received] == [
+        "markets-1",
+        "markets-2",
+        "markets-3",
+        "technology-1",
+    ]
+    assert len(digest.items) == settings.max_stories
     assert digest.key_points == ["point"]
 
 
 def test_brief_failure_is_not_fatal(settings, articles):
     digest = main.build_digest(settings, {"markets": articles}, FakeSummarizer(brief_fails=True))
-    assert digest.sections
+    assert digest.items
     assert digest.key_points == []
 
 

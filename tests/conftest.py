@@ -44,7 +44,7 @@ def settings() -> Settings:
         email_sender="sender@gmail.com",
         email_password="app-password",
         email_receivers=("a@example.com", "b@example.com"),
-        articles_per_category=2,
+        max_stories=2,
         candidates_per_category=5,
         feeds={
             "markets": [

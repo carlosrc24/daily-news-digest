@@ -23,39 +23,37 @@ LABELS: dict[str, dict[str, str]] = {
         "title": "Daily Briefing",
         "subtitle": "Economy · Geopolitics · Technology",
         "key_points": "The day in brief",
-        "context": "Context",
-        "impact": "Impact",
-        "conclusion": "Takeaway",
         "read_more": "Read at",
-        "failed": "Unavailable today",
         "footer": "Summaries generated automatically with {model}. "
         "They may contain errors: check the original source before relying on them.",
-        "stats": "{articles} stories · {sections} sections",
+        "stats": "Top {articles} stories of the day",
         "cat.us": "United States",
         "cat.europe": "Europe",
         "cat.asia": "Asia & Japan",
         "cat.markets": "Markets & Economy",
         "cat.geopolitics": "Geopolitics",
         "cat.technology": "Technology",
+        "topic.economy": "Economy",
+        "topic.geopolitics": "Geopolitics",
+        "topic.technology": "Technology",
     },
     "es": {
         "title": "Resumen diario",
         "subtitle": "Economía · Geopolítica · Tecnología",
         "key_points": "Lo esencial del día",
-        "context": "Contexto",
-        "impact": "Impacto",
-        "conclusion": "Conclusión",
         "read_more": "Leer en",
-        "failed": "No disponible hoy",
         "footer": "Resúmenes generados automáticamente con {model}. "
         "Pueden contener errores: contrasta con la fuente original.",
-        "stats": "{articles} noticias · {sections} secciones",
+        "stats": "Las {articles} noticias clave del día",
         "cat.us": "Estados Unidos",
         "cat.europe": "Europa",
         "cat.asia": "Asia y Japón",
         "cat.markets": "Mercados y Economía",
         "cat.geopolitics": "Geopolítica",
         "cat.technology": "Tecnología",
+        "topic.economy": "Economía",
+        "topic.geopolitics": "Geopolítica",
+        "topic.technology": "Tecnología",
     },
 }
 
@@ -86,6 +84,10 @@ def labels(code: str) -> dict[str, str]:
 
 def category_label(category: str, code: str) -> str:
     return labels(code).get(f"cat.{category}", category.replace("_", " ").title())
+
+
+def topic_label(topic: str, code: str) -> str:
+    return labels(code).get(f"topic.{topic}", topic.title())
 
 
 def format_date(value: datetime, code: str) -> str:

@@ -15,16 +15,17 @@ stories, and emails a newsletter-style HTML digest. It runs for free every morni
 
 ## Features
 
-- **6 sections**: United States, Europe, Asia & Japan, Markets & Economy, Geopolitics and
-  Technology, from ~30 verified feeds (FT, BBC, The Economist, Nikkei Asia, SCMP...).
-- **Structured analysis** per story: *Context*, economic/geopolitical *Impact* and
-  *Takeaway*, plus an opening **"The day in brief"** block that connects the sections.
-- **Relevance-based selection**: Gemini receives ~3× candidates per section, picks the most
-  significant ones and drops duplicate coverage of the same story across outlets.
+- **Top 10 stories a day**: ~30 verified feeds (FT, BBC, The Economist, Nikkei Asia,
+  SCMP...) across the US, Europe, Asia, markets, geopolitics and technology are ranked
+  together, and Gemini keeps the 10 most important whatever their topic.
+- **Short and to the point**: each story is a headline, a topic tag (Economy, Geopolitics,
+  Technology) and a 3-4 sentence summary, plus an opening **"The day in brief"** block.
+- **Relevance-based selection**: the model drops minor news and duplicate coverage of the
+  same story across outlets.
 - **Multilingual**: `DIGEST_LANGUAGE=en|es|fr|...` sets the language of the analysis and the
   template.
-- **Fault tolerant**: a dead feed or a failed section never blocks delivery.
-- **Zero cost**: Gemini free tier (~7 calls/day) + GitHub Actions + Gmail SMTP.
+- **Fault tolerant**: a dead feed or a failed daily brief never blocks delivery.
+- **Zero cost**: Gemini free tier (2 calls/day) + GitHub Actions + Gmail SMTP.
 - **Fallback model**: if the primary model is overloaded (503) or out of daily quota (429),
   a second model with its own quota takes over automatically.
 
@@ -34,8 +35,8 @@ stories, and emails a newsletter-style HTML digest. It runs for free every morni
                 ┌────────────┐     ┌──────────────┐     ┌────────────┐
  RSS feeds ───▶ │ fetcher.py │ ──▶ │ summarizer.py│ ──▶ │ mailer.py  │ ──▶ Gmail
  (~30, in       │ download,  │     │ Gemini: 1    │     │ Jinja2 →   │     (SMTP
-  parallel)     │ 24h filter,│     │ call per     │     │ HTML + txt │      587 TLS)
-                │ dedupe     │     │ section + 1  │     │            │
+  parallel)     │ 24h filter,│     │ ranking call │     │ HTML + txt │      587 TLS)
+                │ dedupe     │     │ (top 10) + 1 │     │            │
                 └────────────┘     │ daily brief  │     └────────────┘
                                    └──────────────┘
                 main.py orchestrates · config.py loads .env and feeds
@@ -60,9 +61,9 @@ stories, and emails a newsletter-style HTML digest. It runs for free every morni
 - **The model cannot invent links.** Gemini is only asked for an `article_id` plus analysis;
   the original headline, source and URL come from the RSS data. Unknown or repeated IDs are
   discarded.
-- **One call per section.** Lets the model compare and rank stories across sources, fits
-  comfortably within free-tier limits, and isolates failures (if one section fails, the rest
-  is still sent and the email footer says so).
+- **One ranking call for every candidate.** The model weighs all topics against each other
+  to pick the day's top stories, and the whole run needs only two requests, far inside the
+  free tier.
 - **Selective retries and a fallback model.** Backoff (tenacity) only for `5xx` and
   per-minute `429`s, honouring the API's *"retry in Ns"* hint. A **daily** quota `429` is not
   retried (it would only burn requests): the model is marked as exhausted and the fallback
@@ -129,7 +130,7 @@ python main.py               # full run: build and send the email
    | `EMAIL_RECEIVER` | Recipient(s), comma-separated |
 
 3. (Optional) In the **Variables** tab, set `DIGEST_LANGUAGE` (e.g. `es`), `GEMINI_MODEL` or
-   `ARTICLES_PER_CATEGORY`.
+   `MAX_STORIES`.
 4. Try it from **Actions → Daily digest → Run workflow** (tick *dry_run* to build without
    sending; the HTML is kept as a downloadable run artifact).
 
@@ -160,8 +161,8 @@ For another time or time zone, change both `cron` entries and `LOCAL_TZ` in
 | `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | Fallback model (`none` disables it) |
 | `DIGEST_LANGUAGE` | `en` | Language of the analysis and template (`en`, `es`; other codes use English labels) |
 | `LOOKBACK_HOURS` | `24` | News time window |
-| `ARTICLES_PER_CATEGORY` | `4` | Stories per section in the email |
-| `CANDIDATES_PER_CATEGORY` | `3 × ARTICLES` | Candidates sent to Gemini per section |
+| `MAX_STORIES` | `10` | Maximum stories in the email |
+| `CANDIDATES_PER_CATEGORY` | `10` | Candidates per feed category sent to the ranking call |
 | `MAX_PER_FEED` | `8` | Maximum entries read from each feed |
 
 Feeds are defined in `DEFAULT_FEEDS` (`src/config.py`); adding a section means adding a key
@@ -172,8 +173,7 @@ there and its label in `src/i18n.py`.
 | Code | Meaning |
 |---|---|
 | `0` | Digest built (and sent) successfully |
-| `1` | Configuration error, no feeds available or every section failed: **nothing is sent** |
-| `2` | Sent, but a section failed (the Actions run turns red so you notice) |
+| `1` | Configuration error, no feeds available or story selection failed: **nothing is sent** |
 
 ## Tests and quality
 
